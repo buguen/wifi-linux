@@ -1,24 +1,23 @@
 #!/usr/bin/env python
 #-*- encoding: utf-8 -*-
 import dbus
-import gobject 
+import gobject
 import os
 import sys
-import glib 
-from dbus.mainloop.glib import DBusGMainLoop 
-import Gnuplot 
-class WiFiList(): 
-    def __init__(self, timer, watched):
+import glib
+import pdb
+from dbus.mainloop.glib import DBusGMainLoop
+import matplotlib.pyplot as plt
+class WiFiList():
+    def __init__(self, timer):
         self.bus = dbus.SystemBus()
         self.NM = 'org.freedesktop.NetworkManager'
         self.bus.add_signal_receiver(self.handle_change, None, self.NM + '.AccessPoint', None, None)
         nm = self.bus.get_object(self.NM, '/org/freedesktop/NetworkManager')
-        self.devlist = nm.GetDevices(dbus_interface = self.NM) 
+        self.devlist = nm.GetDevices(dbus_interface = self.NM)
         self.rssid = {}
-        self.gnpl = Gnuplot.Gnuplot()
         self.timing = 0
         self.data = {}
-        self.watched = watched
         self.timer = timer
         self.plotchange = 0
 
@@ -39,7 +38,7 @@ class WiFiList():
             for j in i:
                 res.append(self.bus.get_object(self.NM, j))
         return res
-    
+
     def form_rssi_dic(self):
         for i in self.repopulate_ap_list():
             ssid = self.dbus_get_property('Ssid', 'AccessPoint', i)
@@ -52,23 +51,17 @@ class WiFiList():
         if self.plotchange == 1:
             self.timeout()
 
-    def plotter(self, data):
-        self.gnpl('set terminal x11 size 1024 3000')
-        self.gnpl('set grid')
-        self.gnpl('set multiplot')
-        cnt = 0
+    def plotter(self,data):
         for i in data:
-            cnt+=1
-            self.gnpl('set origin 0, %f' % (1 - 0.33*cnt))
-            self.gnpl('set size 1, %f' % (0.33))
-            self.gnpl('set style data linespoints')
-            self.gnpl.title(i)
-            self.gnpl.plot(data[i])
-        self.gnpl('unset multiplot')
+            plt.plot(data[i])
+        plt.show()
 
     def timeout(self, breakpoint = False):
         self.timing+=1;
-        for i in [x for x in self.watched if x in self.rssid]:
+        print "data ",self.data
+        print "rssid ",self.rssid
+        for i in [x for x in self.rssid]:
+            print "keys : ",i
             if i in self.data.keys():
                 self.data[i].append([self.timing, self.rssid[i]])
                 if breakpoint:
@@ -86,7 +79,7 @@ class WiFiList():
 
     def iowch(self, arg, key, loop):
         cmd = sys.stdin.readline()
-        if "plot" in cmd: 
+        if "plot" in cmd:
             print 'plotting your wifi data'
             self.plotter(self.data)
         if "bp" in cmd:
@@ -112,9 +105,9 @@ if __name__ == '__main__':
         timeout = int(sys.argv[1]) * 1000
     except:
         timeout = 5000
-    print timeout
-    wfl = WiFiList(timeout, sys.argv[2:])
+    wfl = WiFiList(timeout)
     wfl.form_rssi_dic()
-    gobject.io_add_watch(sys.stdin, glib.IO_IN, wfl.iowch, loop)
     print wfl
+    gobject.io_add_watch(sys.stdin, glib.IO_IN, wfl.iowch, loop)
     loop.run()
+    print wfl.data

@@ -6,6 +6,8 @@ import os
 import sys
 import glib
 import pdb
+import time
+import pandas as pd
 from dbus.mainloop.glib import DBusGMainLoop
 import matplotlib.pyplot as plt
 class WiFiList():
@@ -16,8 +18,6 @@ class WiFiList():
         nm = self.bus.get_object(self.NM, '/org/freedesktop/NetworkManager')
         self.devlist = nm.GetDevices(dbus_interface = self.NM)
         self.rssid = {}
-        self.timing = 0
-        self.data = {}
         self.timer = timer
         self.plotchange = 0
 
@@ -52,30 +52,17 @@ class WiFiList():
             self.timeout()
 
     def plotter(self,data):
-        for i in data:
-            plt.plot(data[i])
+        data.plot()
         plt.show()
 
     def timeout(self, breakpoint = False):
-        self.timing+=1;
-        print "data ",self.data
-        print "rssid ",self.rssid
-        for i in [x for x in self.rssid]:
-            print "keys : ",i
-            if i in self.data.keys():
-                self.data[i].append([self.timing, self.rssid[i]])
-                if breakpoint:
-                    self.data[i].append([self.timing, self.rssid[i]+4])
-                    self.data[i].append([self.timing, self.rssid[i]-4])
-                    self.data[i].append([self.timing, self.rssid[i]])
-            else:
-                self.data[i] = []
-                self.data[i].append([self.timing, self.rssid[i]])
-                if breakpoint:
-                    self.data[i].append([self.timing, self.rssid[i]+4])
-                    self.data[i].append([self.timing, self.rssid[i]-4])
-                    self.data[i].append([self.timing, self.rssid[i]])
-        return True
+        df = pd.DataFrame(columns=self.rssid)
+        df.loc[time.ctime()]=self.rssid
+        try:
+            self.data=pd.concat([self.data,df])
+        except:
+            self.data=df
+        print self.data
 
     def iowch(self, arg, key, loop):
         cmd = sys.stdin.readline()
